@@ -84,27 +84,8 @@ var Particle = function(x, y){
         acceleration = acceleration.copyFrom(this.velocity);
         acceleration.mul(this.speed * delta);
         this.position.add(acceleration);
-
-        /*this.jointAlpha -= 0.01;
-        this.linkAlpha -= 0.015;
-
-        if(this.jointAlpha >= this.alpha){
-            this.jointAlpha = this.alpha;
-        } else if(this.jointAlpha <= 0){
-            this.jointAlpha = 0;
-        }*/
-      this.jointAlpha = this.alpha;
-
-        /*if(this.linkAlpha >= this.alpha){
-            this.linkAlpha = this.alpha;
-        } else if(this.linkAlpha <= 0){
-            this.linkAlpha = 0;
-        }*/
-      this.linkAlpha = this.alpha;
-
-        /*if(this.linkAlpha <= 0){
-            this.childs = [];
-        }*/
+        this.jointAlpha = this.alpha;
+        this.linkAlpha = this.alpha;
     }
 
     this.addChild = function(link){
@@ -118,12 +99,9 @@ var Particle = function(x, y){
     this.removeChild = function(link){
         for(i = 0; i < this.childs.length; i++){
             if(this.childs[i] === link){
-                //return false;
                 this.childs.splice(i,1);
             }
         }
-        //var n = this.childs.indexOf(link);
-        
     }
 };
 
@@ -138,11 +116,9 @@ var ParticleNet = function($canvas){
 
     var particleSpeed = 2.0,
         ctimermax = 300,
-        mouseRadius = 200,
         particleRadius = 100,
         particleRadiusMin = 30,
-        maxjoints = 5,
-        mouseLive = 1;
+        maxjoints = 5;
 
     var context,
         width,
@@ -150,8 +126,6 @@ var ParticleNet = function($canvas){
         center,
         particles = [],
         cparticle,
-        mousePos = false,
-        mouseTTL = 0,
         time = 0,
         newTime = 0,
         ctimer = ctimermax,
@@ -191,8 +165,9 @@ var ParticleNet = function($canvas){
         width = $canvas.width = window.innerWidth;
         height = $canvas.height = window.innerHeight;
         center = new Vector(width/2, height/2);
-        generateParticles(width * height / 7000 );
-
+        var count = width * height / 7000;
+        console.log("Particles: " + count);
+        generateParticles(count);        
     };
 
     var addEvent = function($el, eventType, handler) {
@@ -228,11 +203,6 @@ var ParticleNet = function($canvas){
         cparticle.addChild(particles[0]);
         cparticle.addChild(particles[1]);
         cparticle.addChild(particles[2]);
-      
-        //particles[0].position = center;
-        //particles[0].velocity.x = particles[0].velocity.y = 0;
-
-
     };
 
     var draw = function(){
@@ -257,7 +227,6 @@ var ParticleNet = function($canvas){
         context.fillStyle = lightTriangleColor;//'';
         context.beginPath();
         context.moveTo(cparticle.childs[0].position.x, cparticle.childs[0].position.y);
-        //context.moveTo(cparticle.position.x, cparticle.position.y);
         if (cparticle.childs[1]) context.lineTo(cparticle.childs[1].position.x, cparticle.childs[1].position.y);
         if (cparticle.childs[2]) context.lineTo(cparticle.childs[2].position.x, cparticle.childs[2].position.y);
         context.fill();
@@ -265,7 +234,6 @@ var ParticleNet = function($canvas){
         context.fillStyle = darkTriangleColor; //'#';
         context.beginPath();
         context.moveTo(cparticle.childs[0].position.x, cparticle.childs[0].position.y);
-        //context.moveTo(cparticle.position.x, cparticle.position.y);
         if (cparticle.childs[1]) context.lineTo(cparticle.childs[1].position.x, cparticle.childs[1].position.y);
         if (cparticle.childs[3]) context.lineTo(cparticle.childs[3].position.x, cparticle.childs[3].position.y);
         context.fill();
@@ -288,12 +256,6 @@ var ParticleNet = function($canvas){
 
     var update = function(delta){
       ctimer += 1;
-      
-        //darkTriangleColor = Math.random()*2 > 1 ? "#cc0000":"#00cc00" 
-      //lightTriangleColor = window.getComputedStyle(document.getElementsByClassName("year")[0]).getPropertyValue("fill");
-      darkTriangleColor = window.getComputedStyle(document.getElementById("darkcolor")).getPropertyValue("background-color");
-      lightTriangleColor = window.getComputedStyle(document.getElementById("lightcolor")).getPropertyValue("background-color");
-
         for(i = 0; i < particles.length; i++){
             particles[i].update(delta);
 
@@ -369,11 +331,6 @@ var ParticleNet = function($canvas){
             p1.linked = false;
             p2.linked = false;
             p1.removeChild(p2);
-            /*if(p1.linkAlpha <= 0){
-                p1.linked = false;
-                p2.linked = false;
-                
-            } */
         }
     }
 
