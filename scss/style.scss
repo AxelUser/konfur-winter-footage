@@ -1,0 +1,79 @@
+body, html{
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.particle-net {
+  background-color: black;
+  padding: 0;
+  margin: 0;
+}  
+
+.logo {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  background-color2: #ccc;
+}
+.logo svg {
+  display2: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  margin: auto;
+  width: auto;
+  height: 40%;
+}
+.slogan {
+  position: absolute;
+  width: 100%;
+  color: #999;
+  font-family: "Consolas", "Lucida Console", Monaco, monospace;
+  font-size: 20px;
+  font-size: 5vh;
+  bottom: 5%;
+  margin: 0 auto;
+  text-align: center;
+}
+
+$redyear: #D70C17;
+$redlight: #A20008;
+$reddark: #7A0006;
+
+$greenyear: #B5CEA8;
+$greenlight: #687C5D;
+$greendark: #4E5C46;
+
+$blueyear: #7DB2DD;
+$bluelight: #5087B3;
+$bluedark: #325B7C;
+
+.year { fill: $redyear; animation-: yearcolor 10s ease-in-out infinite; }
+#darkcolor { background-color: $reddark; animation-: darkcolor 10s ease-in-out infinite; }
+#lightcolor { background-color: $redlight; animation-: lightcolor 10s ease-in-out infinite; }
+
+@keyframes yearcolor{
+  100%, 0%, 25%{ fill: $redyear; }
+  30%, 55%{ fill: $greenyear; }
+  60%, 85%{ fill: $blueyear; }
+}
+
+@keyframes darkcolor{
+  100%, 0%, 25%{ background-color: $reddark; }
+  30%, 55%{ background-color: $greendark; }
+  60%, 85%{ background-color: $bluedark; }
+}
+
+.color { position: absolute; }
+
+@keyframes lightcolor{
+  100%, 0%, 25%{ background-color: $redlight; }
+  30%, 55%{ background-color: $greenlight; }
+  60%, 85%{ background-color: $bluelight; }
+}
