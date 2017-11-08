@@ -74,6 +74,8 @@ var Particle = function(x, y){
     this.distance = false;
     this.alpha = 0.3;
 
+    this.cell = null;
+
     this.jointAlpha = this.alpha;
     this.linkAlpha = this.alpha;
 
@@ -105,7 +107,137 @@ var Particle = function(x, y){
     }
 };
 
+var GridCell = function(id, posLeftTop, width, height) {
+    `use strict`;
 
+    this.id = id || 0;
+    this.width = width || 0;
+    this.height = height || 0;
+
+    this.top = posLeftTop.y;
+    this.bottom = posLeftTop.y + height;
+    this.left = posLeftTop.x;
+    this.right = posLeftTop.x + width;
+
+    this.particles = [];
+
+    this.setParticles = function(particles) {
+        this.particles = [].concat(particles);
+    }
+
+    this.addParticle = function(particle) {
+        particle.cell = this;
+        this.particles.push(particle)
+    }
+
+    this.removeParticle = function(particle) {
+        particle.cell = null;
+        for(var i = 0; i < this.particles.length; i++){
+            if(this.particles[i] === particle){
+                this.particles.splice(i,1);
+            }
+        }
+    }
+
+    this.removeGoneParticles = function() {
+        var removedParticles = [];
+        var savedParticles = [];
+        var posX = 0;
+        var posY = 0;
+        for(var i = 0; i < this.particles.length; i++) {
+            posX = this.particles[i].position.x;
+            posY = this.particles[i].position.y;
+            if(posX < this.left || posX > this.right || posY < this.top || posY > this.bottom){
+                this.particles[i].cell = null;
+                removedParticles.push(this.particles[i]);
+            } else {
+                savedParticles.push(this.particles[i]);
+            }
+        }
+        if(savedParticles.length < this.particles.length) {
+            this.particles = savedParticles;
+        }
+
+        return removedParticles;
+    }
+}
+
+var ParticleGrid = function(width, height, particles) {
+    'use strict';
+    
+    var cells = [];
+
+    var cellFixedWidth = 256;
+    var cellFixedHeight = 256;
+    
+
+    function getCellForParticle(particle) {
+        var xIndex = Math.floor(particle.position.x / cellFixedWidth)
+        var yIndex = Math.floor(particle.position.y / cellFixedHeight)
+
+        return cells[yIndex][xIndex];
+    }
+    
+    function initGrid(width, height, particles) {
+        var id = 0;
+        cells = [];        
+        for(var sumHeight = 0, i = 0; sumHeight < height; sumHeight += cellFixedHeight, i++){
+            cells.push([]);
+            for(var sumWidth = 0; sumWidth < width; sumWidth += cellFixedWidth, id++){
+                cells[i].push(new GridCell(id, cellFixedWidth, cellFixedHeight));
+            }
+        }
+        
+        for(var i = 0; i < particles.length; i++) {
+            var cell = getCellForParticle(particles[i]);
+            cell.addParticle(particles[i]);
+        }
+    }
+
+    function guessOffset(px, py, cell) {
+        var xOffset = 0;
+        var yOffset = 0;
+
+        if(px < cell.left) {
+            xOffset--;
+        } else if (px > cell.right) {
+            xOffset++;
+        }
+
+        if(py < cell.top) {
+            yOffset--;
+        } else if (px > cell.bottom) {
+            yOffset++;
+        }
+
+        return {
+            xOffset,
+            yOffset
+        };
+    }
+
+    this.updateParticlesInCells = function() {
+        for (var i = 0; i < cells.length; i++) {
+            for (var j = 0; j < cells[i].length; j++) {
+                var cell = cells[i][j];
+                var removed = cell.removeGoneParticles();
+                for (var r = 0; r < removed.length; r++) {
+                    var rp = removed[r];
+                    var rpPosX = rp.position.x;
+                    var rpPosY = rp.position.y;
+                    var o = guessOffset(rpPosX, rpPosY, cell);
+                    var yIndex = i + o.yOffset >= 0? i + o.yOffset: 0;
+                    var xIndex = j + o.xOffset >= 0? j + o.xOffset: 0;                    
+                    
+                    cells[yIndex][xIndex].addParticle(rp);
+                }
+            }
+            var cellsRow = cells[i];
+        }
+    }
+
+    initGrid(width, height, particles);
+}
 
 var ParticleNet = function($canvas){
     'use strict';
@@ -133,6 +265,8 @@ var ParticleNet = function($canvas){
         i, y,
         particle;
 
+    var grid = {};
+
     var init = function(){
         if(!$canvas){
             return false;
@@ -144,6 +278,7 @@ var ParticleNet = function($canvas){
         addEvent(window, 'resize', initCanvas);
 
         initCanvas();
+        initGrid();
         loop();
     };
 
@@ -169,6 +304,10 @@ var ParticleNet = function($canvas){
         console.log("Particles: " + count);
         generateParticles(count);        
     };
+
+    var initGrid = function() {
+        grid = new ParticleGrid(width, height, particles)
+    }
 
     var addEvent = function($el, eventType, handler) {
         if($el == null){
@@ -237,9 +376,6 @@ var ParticleNet = function($canvas){
         if (cparticle.childs[1]) context.lineTo(cparticle.childs[1].position.x, cparticle.childs[1].position.y);
         if (cparticle.childs[3]) context.lineTo(cparticle.childs[3].position.x, cparticle.childs[3].position.y);
         context.fill();
-      
-
-      
     };
 
     var getAnimationFrame = function(callback){
@@ -319,8 +455,6 @@ var ParticleNet = function($canvas){
         var distance = p1.position.distance(p2.position);
 
         if(distance <= rmax && distance >= rmin) {
-            p1.linked = true;
-            p2.linked = true;
             if (p1.childs.length >= maxjoints) return;
             p1.addChild(p2);
 
@@ -328,8 +462,6 @@ var ParticleNet = function($canvas){
             p1.jointAlpha += 0.02;
 
         } else {
-            p1.linked = false;
-            p2.linked = false;
             p1.removeChild(p2);
         }
     }
