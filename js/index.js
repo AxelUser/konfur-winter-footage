@@ -201,9 +201,8 @@ var ParticleGrid = function(width, height, particles) {
     var distanceErrorThreshold = 200;
 
     function getCellForParticle(particle) {
-        var xIndex = Math.floor(particle.position.x / cellFixedWidth)
-        var yIndex = Math.floor(particle.position.y / cellFixedHeight)
-
+        var xIndex = Math.floor(particle.position.x / cellFixedWidth);
+        var yIndex = Math.floor(particle.position.y / cellFixedHeight);
         return cells[yIndex][xIndex];
     }
     
@@ -217,7 +216,9 @@ var ParticleGrid = function(width, height, particles) {
             cells.push([]);
             for(var sumWidth = 0; sumWidth < width; sumWidth += cellFixedWidth, colsCount++, id++){
                 var pos = new Vector(sumWidth, sumHeight);
-                cells[rowsCount].push(new GridCell(id, rowsCount, colsCount, pos, cellFixedWidth, cellFixedHeight));
+                var h = sumHeight + cellFixedHeight <= height? cellFixedHeight: height - sumHeight;
+                var w = sumWidth + cellFixedWidth <= width? cellFixedWidth: width - sumWidth;
+                cells[rowsCount].push(new GridCell(id, rowsCount, colsCount, pos, w, h));
             }
         }
         
@@ -229,7 +230,7 @@ var ParticleGrid = function(width, height, particles) {
 
     function guessOffset(px, py, cell) {
         var xOffset = 0;
-        var yOffset = 0;
+        var yOffset = 0;        
 
         if(px < cell.left) {
             xOffset--;
