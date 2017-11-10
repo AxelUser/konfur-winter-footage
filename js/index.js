@@ -182,7 +182,7 @@ var GridCell = function(id, rowIndex, colIndex, posLeftTop, width, height) {
     }
 }
 
-var ParticleGrid = function(width, height, particles) {
+var ParticleGrid = function(width, height, particles, enableDebug) {
     'use strict';
     
     var cells = [];
@@ -190,13 +190,13 @@ var ParticleGrid = function(width, height, particles) {
     var cellFixedWidth = 32;
     var cellFixedHeight = 32;
 
-    
+    var debugMode = enableDebug || false;
 
     var rowsCount = 0;
     var colsCount = 0;
 
-    var cellsSearchRadius = 1;
-    var maxJoins = 10;
+    var cellsSearchRadius = 2;
+    var maxJoins = 5;
     
     var distanceErrorThreshold = 200;
 
@@ -240,7 +240,7 @@ var ParticleGrid = function(width, height, particles) {
 
         if(py < cell.top) {
             yOffset--;
-        } else if (px > cell.bottom) {
+        } else if (py > cell.bottom) {
             yOffset++;
         }
 
@@ -261,10 +261,6 @@ var ParticleGrid = function(width, height, particles) {
                     var rpPosY = rp.position.y;
                     var o = guessOffset(rpPosX, rpPosY, cell);
                     
-                    if((i + o.yOffset) < rowsCount || (j + o.xOffset) < colsCount) {
-
-                    }
-
                     o.yOffset = (i + o.yOffset) >= 0 && (i + o.yOffset) < rowsCount? o.yOffset: 0;
                     var yIndex = i + o.yOffset;
                     o.xOffset = (j + o.xOffset) >= 0 && (j + o.xOffset) < colsCount? o.xOffset: 0;
@@ -290,12 +286,14 @@ var ParticleGrid = function(width, height, particles) {
                         return val != particle;
                     }));
 
-                    for (var t = 0; t < neighbors.length; t++) {
-                        var n = neighbors[t];
-                        if(particle.position.distance(n.position) > distanceErrorThreshold) {
-                            particle.riseError();
-                            n.riseError();
-                            console.log("Distance error", particle, n);
+                    if(debugMode) {
+                        for (var t = 0; t < neighbors.length; t++) {
+                            var n = neighbors[t];
+                            if(particle.position.distance(n.position) > distanceErrorThreshold) {
+                                particle.riseError();
+                                n.riseError();
+                                console.log("Distance error", particle, n);
+                            }
                         }
                     }
                 }
@@ -312,7 +310,6 @@ var ParticleGrid = function(width, height, particles) {
                 var cell = cellsRow[ci];
                 for (var i = 0; i < cell.particles.length; i++) {
                     var p = cell.particles[i];
-                    if(p.cell !== cell) throw "Incorrect cell";
                     var neighbors = getNeighbors(p);
                     p.childs = neighbors.slice(0, maxJoins - 1);
                 }
@@ -339,7 +336,7 @@ var ParticleGrid = function(width, height, particles) {
     initGrid(width, height, particles);
 }
 
-var ParticleNet = function($canvas){
+var ParticleNet = function($canvas, enableDebug){
     'use strict';
   
     var darkTriangleColor = "#7A0006",
@@ -362,9 +359,9 @@ var ParticleNet = function($canvas){
     var grid = {};
 
     //for debug
-    var showGrid = true;
-    var showParticlesWithError = true;
-    var stopOnErrors = true;
+    var showGrid = enableDebug || false;
+    var showParticlesWithError = enableDebug || false;
+    var stopOnErrors = enableDebug || false;
     var hasError = false;
 
 
@@ -404,13 +401,13 @@ var ParticleNet = function($canvas){
         width = $canvas.width = window.innerWidth;
         height = $canvas.height = window.innerHeight;
         center = new Vector(width/2, height/2);
-        var count = width * height / 5000;
+        var count = width * height / 7000;
         console.log("Particles: " + count);
         generateParticles(count);
     };
 
     var initGrid = function() {
-        grid = new ParticleGrid(width, height, particles)
+        grid = new ParticleGrid(width, height, particles, enableDebug);
     }
 
     var addEvent = function($el, eventType, handler) {
@@ -525,32 +522,9 @@ var ParticleNet = function($canvas){
                 particles[i].velocity.y *= -1;
                 particles[i].position.y = 0;
             }
-
-            // for(var y = i + 1; y < particles.length; y++){
-            //     var other = particles;
-            //     getDistance(particles[i], other[y], particleRadius, particleRadiusMin);
-              
-                
-            // }
         }
         grid.update();
     };
-  
-    // var getDistance = function(p1, p2, rmax, rmin){
-        
-    //     var distance = p1.position.distance(p2.position);
-
-    //     if(distance <= rmax && distance >= rmin) {
-    //         if (p1.childs.length >= maxjoints) return;
-    //         p1.addChild(p2);
-
-    //         p1.linkAlpha += 0.01;
-    //         p1.jointAlpha += 0.02;
-
-    //     } else {
-    //         p1.removeChild(p2);
-    //     }
-    // }
 
     var getCurrentTime = function(){
         var date = new Date();
