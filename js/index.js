@@ -187,15 +187,15 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
     
     var cells = [];
 
-    var cellFixedWidth = 32;
-    var cellFixedHeight = 32;
+    var cellFixedWidth = 64;
+    var cellFixedHeight = 64;
 
     var debugMode = enableDebug || false;
 
     var rowsCount = 0;
     var colsCount = 0;
 
-    var cellsSearchRadius = 2;
+    var cellsSearchRadius = 1;
     var maxJoins = 5;
     
     var distanceErrorThreshold = 200;
@@ -275,17 +275,14 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
 
     function getNeighbors(particle) {
         var neighbors = [];
-        var nCells = [];
         var cell = particle.cell;        
         for (var yIndex = cell.rowIndex - cellsSearchRadius; yIndex < (cell.rowIndex + cellsSearchRadius) && yIndex < rowsCount; yIndex++) {
             for (var xIndex = cell.colIndex - cellsSearchRadius; xIndex < (cell.colIndex + cellsSearchRadius) && xIndex < colsCount; xIndex++) {
                 if(yIndex >= 0 && xIndex >= 0) {
                     var p = cells[yIndex][xIndex].particles;
-                    nCells.push({y: yIndex, x: xIndex, id: cells[yIndex][xIndex].id});
-                    neighbors = neighbors.concat(p.filter(function(val){
-                        return val != particle;
-                    }));
-
+                    if(cells[yIndex][xIndex].id != cell.id){
+                        neighbors = neighbors.concat(p);
+                    }
                     if(debugMode) {
                         for (var t = 0; t < neighbors.length; t++) {
                             var n = neighbors[t];
@@ -310,8 +307,7 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
                 var cell = cellsRow[ci];
                 for (var i = 0; i < cell.particles.length; i++) {
                     var p = cell.particles[i];
-                    var neighbors = getNeighbors(p);
-                    p.childs = neighbors.slice(0, maxJoins - 1);
+                    p.childs = getNeighbors(p).slice(0, maxJoins - 1);
                 }
             }
         }
@@ -364,6 +360,11 @@ var ParticleNet = function($canvas, enableDebug){
     var stopOnErrors = enableDebug || false;
     var hasError = false;
 
+    this.setDebugMode = function(isDebug) {
+        showGrid = isDebug;
+        showParticlesWithError = isDebug;
+        stopOnErrors = isDebug;
+    }
 
     var init = function(){
         if(!$canvas){
@@ -537,4 +538,4 @@ var ParticleNet = function($canvas, enableDebug){
 
 
 $canvas = document.querySelector('.particle-net');
-new ParticleNet($canvas);
+var net = new ParticleNet($canvas, false);
