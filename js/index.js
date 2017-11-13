@@ -187,16 +187,17 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
     
     var cells = [];
 
-    var cellFixedWidth = 64;
-    var cellFixedHeight = 64;
+    var cellFixedWidth = 32;
+    var cellFixedHeight = 32;
 
     var debugMode = enableDebug || false;
 
     var rowsCount = 0;
     var colsCount = 0;
 
-    var cellsSearchRadius = 1;
-    var maxJoins = 5;
+    var cellsSearchRadius = 2;
+    var cellsIgnoreRadius = 0;
+    var maxJoins = 3;
     
     var distanceErrorThreshold = 200;
 
@@ -275,10 +276,18 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
 
     function getNeighbors(particle) {
         var neighbors = [];
-        var cell = particle.cell;        
+        var cell = particle.cell;
+        
+        var ignoreY = [cell.rowIndex - cellsIgnoreRadius, cell.rowIndex + cellsIgnoreRadius];
+        var ignoreX = [cell.colIndex - cellsIgnoreRadius, cell.colIndex + cellsIgnoreRadius];
+
         for (var yIndex = cell.rowIndex - cellsSearchRadius; yIndex < (cell.rowIndex + cellsSearchRadius) && yIndex < rowsCount; yIndex++) {
             for (var xIndex = cell.colIndex - cellsSearchRadius; xIndex < (cell.colIndex + cellsSearchRadius) && xIndex < colsCount; xIndex++) {
                 if(yIndex >= 0 && xIndex >= 0) {
+                    if(yIndex >= ignoreY[0] && yIndex <= ignoreY[1] && xIndex >= ignoreX[0] && xIndex <= ignoreX[1]) {
+                        continue;
+                    }
+
                     var p = cells[yIndex][xIndex].particles;
                     if(cells[yIndex][xIndex].id != cell.id){
                         neighbors = neighbors.concat(p);
