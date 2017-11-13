@@ -70,17 +70,21 @@ var Particle = function(id, x, y){
     this.position = new Vector(x, y);
     this.velocity = new Vector();
     this.speed = 0;
+    this.parentId = null;
+    this.connectionsMap = {};
     this.childs = [];
     this.linked = false;
     this.distance = false;
     this.alpha = 0.3;
     this.hasError = false;
 
+    this.connectionsAlphaInc = 0.01;
 
     this.cell = null;
     
     this.jointAlpha = this.alpha;
     this.linkAlpha = this.alpha;
+    this.linkToParentAlpha = 0;
 
     var acceleration = new Vector(),
         i = 0;
@@ -99,13 +103,20 @@ var Particle = function(id, x, y){
         this.linkAlpha = this.alpha;
     }
 
-    this.addChild = function(link){
-        for(i = 0; i < this.childs.length; i++){
-            if(this.childs[i] === link){
-                return false;
-            }
+    this.addChilds = function(childs){
+        var newAlpha = 0;
+        var child = null;
+        var newConnections = {};
+        var newChilds = [];
+        for (var i = 0; i < childs.length; i++) {
+            child = childs[i];
+            newAlpha = this.connectionsMap[child.id+""] != null? this.connectionsMap[child.id+""] + this.connectionsAlphaInc: 0;
+            newConnections[child.id+""] = newAlpha <= 0.3? newAlpha: 0.3;
+            newChilds.push(child);
         }
-        this.childs.push(link);
+        this.connectionsMap = newConnections;
+        this.childs = newChilds;
+        
     }
     this.removeChild = function(link){
         for(i = 0; i < this.childs.length; i++){
@@ -314,7 +325,7 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
                 var cell = cellsRow[ci];
                 for (var i = 0; i < cell.particles.length; i++) {
                     var p = cell.particles[i];
-                    p.childs = getNeighbors(p).slice(0, maxJoins - 1);
+                    p.addChilds(getNeighbors(p).slice(0, maxJoins - 1));
                 }
             }
         }
@@ -474,6 +485,8 @@ var ParticleNet = function($canvas, enableDebug){
 
 
             for(y = 0; y < particle.childs.length; y++){
+                
+                context.strokeStyle = 'rgba(255, 255, 255, ' + particle.connectionsMap[particle.childs[y].id+""].toPrecision(3) + ')';
                 context.beginPath();
                 context.moveTo(particle.position.x, particle.position.y);
                 context.lineTo(particle.childs[y].position.x, particle.childs[y].position.y);
@@ -545,8 +558,6 @@ var ParticleNet = function($canvas, enableDebug){
 
     init();
 };
-
-
 
 $canvas = document.querySelector('.particle-net');
 var net = new ParticleNet($canvas, false);
