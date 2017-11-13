@@ -377,7 +377,6 @@ var ParticleNet = function($canvas, enableDebug){
         addEvent(window, 'resize', initCanvas);
 
         initCanvas();
-        initGrid();
         loop();
     };
 
@@ -405,6 +404,7 @@ var ParticleNet = function($canvas, enableDebug){
         var count = width * height / 7000;
         console.log("Particles: " + count);
         generateParticles(count);
+        initGrid();
     };
 
     var initGrid = function() {
