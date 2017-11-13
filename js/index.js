@@ -133,6 +133,7 @@ var GridCell = function(id, rowIndex, colIndex, posLeftTop, width, height) {
     this.hasError = false;
 
     this.particles = [];
+    this.neighbors = [];
 
     this.setParticles = function(particles) {
         self = this;
@@ -195,8 +196,8 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
     var rowsCount = 0;
     var colsCount = 0;
 
-    var cellsSearchRadius = 2;
-    var cellsIgnoreRadius = 0;
+    var cellsSearchRadius = 3;
+    var cellsIgnoreRadius = 1;
     var maxJoins = 3;
     
     var distanceErrorThreshold = 200;
@@ -223,6 +224,8 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
             }
         }
         
+        initNeighborsForCells();
+
         for(var i = 0; i < particles.length; i++) {
             var cell = getCellForParticle(particles[i]);
             cell.addParticle(particles[i]);
@@ -274,36 +277,31 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
         }
     }
 
-    function getNeighbors(particle) {
-        var neighbors = [];
-        var cell = particle.cell;
-        
-        var ignoreY = [cell.rowIndex - cellsIgnoreRadius, cell.rowIndex + cellsIgnoreRadius];
-        var ignoreX = [cell.colIndex - cellsIgnoreRadius, cell.colIndex + cellsIgnoreRadius];
-
-        for (var yIndex = cell.rowIndex - cellsSearchRadius; yIndex < (cell.rowIndex + cellsSearchRadius) && yIndex < rowsCount; yIndex++) {
-            for (var xIndex = cell.colIndex - cellsSearchRadius; xIndex < (cell.colIndex + cellsSearchRadius) && xIndex < colsCount; xIndex++) {
-                if(yIndex >= 0 && xIndex >= 0) {
-                    if(yIndex >= ignoreY[0] && yIndex <= ignoreY[1] && xIndex >= ignoreX[0] && xIndex <= ignoreX[1]) {
-                        continue;
-                    }
-
-                    var p = cells[yIndex][xIndex].particles;
-                    if(cells[yIndex][xIndex].id != cell.id){
-                        neighbors = neighbors.concat(p);
-                    }
-                    if(debugMode) {
-                        for (var t = 0; t < neighbors.length; t++) {
-                            var n = neighbors[t];
-                            if(particle.position.distance(n.position) > distanceErrorThreshold) {
-                                particle.riseError();
-                                n.riseError();
-                                console.log("Distance error", particle, n);
+    function initNeighborsForCells() {
+        iterateCellsInternal(function(cell) {
+            var ignoreY = [cell.rowIndex - cellsIgnoreRadius, cell.rowIndex + cellsIgnoreRadius];
+            var ignoreX = [cell.colIndex - cellsIgnoreRadius, cell.colIndex + cellsIgnoreRadius];
+            for (var yIndex = cell.rowIndex - cellsSearchRadius; yIndex < (cell.rowIndex + cellsSearchRadius) && yIndex < rowsCount; yIndex++) {
+                for (var xIndex = cell.colIndex - cellsSearchRadius; xIndex < (cell.colIndex + cellsSearchRadius) && xIndex < colsCount; xIndex++) {
+                    if(yIndex >= 0 && xIndex >= 0) {
+                        if((yIndex <= ignoreY[0] || yIndex >= ignoreY[1]) && (xIndex <= ignoreX[0] || xIndex >= ignoreX[1])) {
+                            if(yIndex != cell.rowIndex || xIndex != cell.colIndex){
+                                cell.neighbors.push(cells[yIndex][xIndex]);
                             }
                         }
                     }
                 }
             }
+        });
+    }
+
+    function getNeighbors(particle) {
+        var neighbors = [];
+        var cell = particle.cell;
+        
+        for (var i = 0; i < cell.neighbors.length; i++) {
+            var neighborCell = cell.neighbors[i];
+            neighbors = neighbors.concat(neighborCell.particles);
         }
 
         return neighbors;
@@ -322,7 +320,7 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
         }
     }
 
-    this.iterateCells = function(cb) {
+    function iterateCellsInternal(cb){
         for (var cr = 0; cr < cells.length; cr++) {
             var cellsRow = cells[cr];
             for (var ci = 0; ci < cellsRow.length; ci++) {
@@ -331,6 +329,10 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
                 cb(cell);
             }
         }
+    }
+
+    this.iterateCells = function(cb) {
+        iterateCellsInternal(cb);
     }
 
     this.update = function() {
