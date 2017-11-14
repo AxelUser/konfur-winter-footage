@@ -382,6 +382,9 @@ var ParticleNet = function($canvas, enableDebug){
     var stopOnErrors = enableDebug || false;
     var hasError = false;
 
+    var stopOnBlur = true;
+    var runLoop = true;
+
     this.setDebugMode = function(isDebug) {
         showGrid = isDebug;
         showParticlesWithError = isDebug;
@@ -395,15 +398,30 @@ var ParticleNet = function($canvas, enableDebug){
 
         time = getCurrentTime();
         context = $canvas.getContext('2d');
-
         addEvent(window, 'resize', initCanvas);
+
+        if(stopOnBlur) {
+            addEvent(window, 'focus', continueLoop);
+            addEvent(window, 'blur', stopLoop);
+        }
 
         initCanvas();
         loop();
     };
 
+    var continueLoop = function() {
+        if(!runLoop) {
+            runLoop = true;
+            loop();
+        }
+    }
+
+    var stopLoop = function() {
+        runLoop = false;
+    }
+
     var loop = function(){
-        if(stopOnErrors && hasError){
+        if(!runLoop || stopOnErrors && hasError){
             return;
         }
         newTime = getCurrentTime();
@@ -523,7 +541,7 @@ var ParticleNet = function($canvas, enableDebug){
             window.setTimeout(callback, 1000 / 60);
         }
     };
-
+ 
     var update = function(delta){
         for(i = 0; i < particles.length; i++){
             particles[i].update(delta);
