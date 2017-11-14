@@ -82,7 +82,7 @@ var Particle = function(id, x, y){
 
     this.cell = null;
     
-    this.jointAlpha = this.alpha;
+    this.jointAlpha = 0.8;
     this.linkAlpha = this.alpha;
     this.linkToParentAlpha = 0;
 
@@ -99,7 +99,7 @@ var Particle = function(id, x, y){
         acceleration = acceleration.copyFrom(this.velocity);
         acceleration.mul(this.speed * delta);
         this.position.add(acceleration);
-        this.jointAlpha = this.alpha;
+        this.jointAlpha = 0.8;
         this.linkAlpha = this.alpha;
     }
 
@@ -513,7 +513,7 @@ var ParticleNet = function($canvas, enableDebug){
 
     var draw = function(){
         context.clearRect ( 0 , 0 , width , height );
-        context.lineWidth = 1;
+        context.lineWidth = 1.2;
         particle = {};
         for(i = 0; i < particles.length; i++){
             particle = particles[i];
