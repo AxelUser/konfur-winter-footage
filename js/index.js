@@ -524,12 +524,11 @@ var ParticleNet = function($canvas, enableDebug){
                 context.fillStyle = 'red';
                 context.fillRect(particle.position.x-2, particle.position.y-2, 5, 5);
             } else {
+                context.beginPath();
                 context.fillStyle = 'rgba(255, 255, 255, ' +particle.jointAlpha.toPrecision(3) + ')';
-                context.fillRect(particle.position.x-1, particle.position.y-1, 3, 3);
-            }
-            
-            
-            context.fillRect(particle.position.x-1, particle.position.y-1, 3, 3);
+                context.arc(particle.position.x, particle.position.y, 2, 0, 2 * Math.PI);
+                context.fill();
+            } 
 
 
             for(y = 0; y < particle.childs.length; y++){
