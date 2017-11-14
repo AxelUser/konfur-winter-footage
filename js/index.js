@@ -391,6 +391,37 @@ var ParticleNet = function($canvas, enableDebug){
         stopOnErrors = isDebug;
     }
 
+    var initPauseOnInactiveTab = function() {
+        var hidden, visibilityChange; 
+        if (typeof document.hidden !== "undefined") {
+            hidden = "hidden";
+            visibilityChange = "visibilitychange";
+        } else if (typeof document.msHidden !== "undefined") {
+            hidden = "msHidden";
+            visibilityChange = "msvisibilitychange";
+        } else if (typeof document.webkitHidden !== "undefined") {
+            hidden = "webkitHidden";
+            visibilityChange = "webkitvisibilitychange";
+        }
+        
+        
+        function handleVisibilityChange() {
+            if (document[hidden]) {
+                stopLoop();
+            } else {
+                continueLoop();
+            }
+        }
+
+        if (typeof document[hidden] === "undefined") {
+            console.log("This footage requires a browser, such as Google Chrome or Firefox, that supports the Page Visibility API. Will be using fallback.");
+            addEvent(window, 'focus', continueLoop);
+            addEvent(window, 'blur', stopLoop);
+        } else {
+            addEvent(document, visibilityChange, handleVisibilityChange);
+        }
+    }
+
     var init = function(){
         if(!$canvas){
             return false;
@@ -401,8 +432,7 @@ var ParticleNet = function($canvas, enableDebug){
         addEvent(window, 'resize', initCanvas);
 
         if(stopOnBlur) {
-            addEvent(window, 'focus', continueLoop);
-            addEvent(window, 'blur', stopLoop);
+            initPauseOnInactiveTab();
         }
 
         initCanvas();
