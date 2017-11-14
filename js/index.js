@@ -212,7 +212,7 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
 
     this.cellsSearchRadius = 3;
     this.cellsIgnoreRadius = 1;
-    this.maxJoins = 0;
+    this.maxJoins = 3;
     
     this.distanceErrorThreshold = 200;
 
@@ -293,6 +293,18 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
     }
 
     this.initNeighborsForCells = function () {
+        var shuffle = function(array) {
+            var currentIndex = array.length, temporaryValue, randomIndex;
+            while (0 !== currentIndex) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex -= 1;
+                temporaryValue = array[currentIndex];
+                array[currentIndex] = array[randomIndex];
+                array[randomIndex] = temporaryValue;
+            }
+          
+            return array;
+        }
         this.iterateCells(function(cell, grid) {
             var ignoreY = [cell.rowIndex - grid.cellsIgnoreRadius, cell.rowIndex + grid.cellsIgnoreRadius];
             var ignoreX = [cell.colIndex - grid.cellsIgnoreRadius, cell.colIndex + grid.cellsIgnoreRadius];
@@ -307,6 +319,7 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
                     }
                 }
             }
+            cell.neighbors = shuffle(cell.neighbors);
         });
     }
 
@@ -353,6 +366,10 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
     }
 
     this.initGrid(width, height, particles);
+}
+
+var SnowflakeParticleGrid = function(grid){
+   
 }
 
 var ParticleNet = function($canvas, enableDebug){
