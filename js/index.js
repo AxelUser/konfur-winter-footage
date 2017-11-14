@@ -212,7 +212,7 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
 
     this.cellsSearchRadius = 3;
     this.cellsIgnoreRadius = 1;
-    this.maxJoins = 3;
+    this.maxJoins = 0;
     
     this.distanceErrorThreshold = 200;
 
@@ -329,7 +329,7 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
                 var cell = cellsRow[ci];
                 for (var i = 0; i < cell.particles.length; i++) {
                     var p = cell.particles[i];
-                    p.addChilds(getNeighbors(p).slice(0, this.maxJoins - 1));
+                    p.addChilds(getNeighbors(p).slice(0, this.maxJoins));
                 }
             }
         }
