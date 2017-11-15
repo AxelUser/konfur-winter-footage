@@ -917,4 +917,4 @@ var ParticleNet = function($canvas, enableDebug){
 };
 
 $canvas = document.querySelector('.particle-net');
-var net = new ParticleNet($canvas, true);
+var net = new ParticleNet($canvas, false);
