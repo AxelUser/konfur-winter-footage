@@ -418,31 +418,32 @@ var ParticleGrid = function(width, height, options) {
         }
     }
 
+    this.getAllParticles = function() {
+        var all = [];
+        this.iterateCells(function(cell){
+            all = all.concat(cell.particles);
+        });
+        return all;
+    }
+
     this.update = function() {
         this.updateParticlesInCells();
         this.connectParticles();
     }
 }
 
-var SnowflakeParticleGrid = function(particleGrid, defParticleSpeed){
+var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enableDebug){
     'use strict';
 
     var centerOffsetX = -32; //weird
     var nodeSpeed = 0.5;
+    var nodeCells = [];
 
     function initSnowflakeCenterCell(grid) {
         var node = null;
-        var centerCell = grid.getCellForPosition(grid.width / 2 + centerOffsetX, grid.height / 2);
-        var centerCellNeighbors = grid.getCellsNeighbors(0, 2, centerCell, grid);
-        centerCellNeighbors.forEach(function(n){            
-            n.removeSelfFromNeighbors();
-        });
-        centerCell.removeSelfFromNeighbors();
-        centerCell.neighbors = centerCellNeighbors;
-        centerCell.neighbors.forEach(function(c) {
-            c.neighbors = centerCellNeighbors.concat(centerCell);
-        });
-        centerCell = formatNodeCell(centerCell);
+
+        var centerCell = formatNodeCell(grid.getCellForPosition(grid.width / 2 + centerOffsetX, grid.height / 2), 
+                                grid.getCellsNeighbors(0, 2, centerCell, grid));
 
         centerCell.getNode = function() {
             if(centerCell.particles.length > 0) {
@@ -462,7 +463,7 @@ var SnowflakeParticleGrid = function(particleGrid, defParticleSpeed){
         centerCell.updateNode = function() {
             node = centerCell.getNode();
             if(node == null) {
-                var id = particleGrid.particles[particleGrid.particles.length - 1].id+1;
+                var id = grid.particles[grid.particles.length - 1].id+1;
                 node = new Particle(id, centerCell.center.x, centerCell.center.y);
                 node.wasCreated = true;
                 node.speed = 0;
@@ -476,6 +477,8 @@ var SnowflakeParticleGrid = function(particleGrid, defParticleSpeed){
 
         }
 
+        nodeCells.push(centerCell);
+
         return centerCell;
     }
 
@@ -485,20 +488,11 @@ var SnowflakeParticleGrid = function(particleGrid, defParticleSpeed){
         return grid.getCellForPosition(x, y);
     }
 
-    function initTier1Nodes(centerCell) {
+    function initTier1Nodes(grid, centerCell) {
         for(var a = 0; a < 2*Math.PI; a+=2*Math.PI/6){
-            var nodeCell = getCellAtAngle(a, 192, centerCell, particleGrid);
-
-            var nodeCellNeighbors = particleGrid.getCellsNeighbors(0, 1, nodeCell, particleGrid);
-            nodeCellNeighbors.forEach(function(n){            
-                n.removeSelfFromNeighbors();
-            });
-            nodeCell.removeSelfFromNeighbors();
-            nodeCell.neighbors = nodeCellNeighbors;
-            nodeCell.neighbors.forEach(function(c) {
-                c.neighbors = nodeCellNeighbors.concat(nodeCell).concat(centerCell.neighbors);
-            });
-            nodeCell = formatNodeCell(nodeCell);
+            var nodeCell = formatNodeCell(getCellAtAngle(a, 192, centerCell, grid), 
+                                        grid.getCellsNeighbors(0, 1, nodeCell, grid),
+                                        centerCell.neighbors);
 
             nodeCell.getNode = function() {
                 if(nodeCell.particles.length > 0) {
@@ -514,36 +508,73 @@ var SnowflakeParticleGrid = function(particleGrid, defParticleSpeed){
                     }
                 }
             }
+
+            nodeCells.push(nodeCell);
         }
     }
 
-    function formatNodeCell(cell) {
-        cell.isCustom = true;
-        cell.neighbors = cell.neighbors.map(function(c){
-            c.isCustom = true;
-            return c;
+    function formatNodeCell(cell, selfNeighbors, foreignNeighbors) {
+        var sn = selfNeighbors || [];
+        var fn = foreignNeighbors || [];
+        cell.neighbors.forEach(function(n){
+            n.removeSelfFromNeighbors();
         });
+        cell.removeSelfFromNeighbors();
+        cell.neighbors = sn;
+        cell.neighbors.forEach(function(c) {
+            c.isCustom = true;
+            c.neighbors = sn.concat(cell).concat(fn);
+        });
+        cell.isCustom = true;
+
         return cell;
     }
 
-    this.update = function(){
-        particleGrid.update();
-    }
-
-    this.iterateCells = function(cb) {
-        particleGrid.iterateCells(cb);
-    }
-
-    this.getCellForPosition = function(x, y) {
-        return particleGrid.getCellForPosition(x, y);
-    }
-
-    var init = function(grid) {
+    var afterCreateCb = function(grid) {
         var center = initSnowflakeCenterCell(grid);
-        initTier1Nodes(center);
+        initTier1Nodes(grid, center);
     }
 
-    init(particleGrid);
+    var particlesFactory = function(grid) {
+        var id = 0;
+
+        var particles = nodeCells.map(function(v, i){
+            var v = new Particle(i, v.center.x, v.center.y);
+            v.radius = 4;
+        });
+
+        var count = width * height / 7000;
+        var x = 0,
+            y = 0;
+        for(var i = 0; i < count; i++){
+            x = Math.random() * window.innerWidth;
+            y = Math.random() * window.innerHeight;
+
+            var particle = new Particle(i, x, y);
+            particle.velocity.x = Math.random() -0.5;
+            particle.velocity.y = Math.random() -0.5;
+            particle.velocity.nor();
+            particle.speed = defParticleSpeed;
+            particles.push(particle);
+        }
+
+        return particles;
+    }
+
+    var initOptions = function() {
+        var center = initSnowflakeCenterCell(grid);
+        initTier1Nodes(grid, center);
+    }
+
+    var createGrid = function(width, height, enableDebug){
+        var grid = new ParticleGrid(width, height, { enableDebug: enableDebug });
+        grid.initGrid();
+        grid.addParticles(particlesFactory);
+
+        return grid;
+    }
+
+    return createGrid(width, height, enableDebug);
 }
 
 var ParticleNet = function($canvas, enableDebug){
@@ -706,9 +737,8 @@ var ParticleNet = function($canvas, enableDebug){
     };
 
     var initGrid = function() {
-        grid = new ParticleGrid(width, height, { enableDebug: enableDebug });
-        grid.initGrid();
-        grid.addParticles(generateParticles);
+        grid = createSnowflakeParticleGrid(width, height, particleSpeed, enableDebug);
+        particles = grid.getAllParticles();
     }
 
     var addEvent = function($el, eventType, handler) {
@@ -845,4 +875,4 @@ var ParticleNet = function($canvas, enableDebug){
 };
 
 $canvas = document.querySelector('.particle-net');
-var net = new ParticleNet($canvas, false);
+var net = new ParticleNet($canvas, true);
