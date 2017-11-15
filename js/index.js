@@ -76,6 +76,7 @@ var Particle = function(id, x, y){
     this.linked = false;
     this.distance = false;
     this.alpha = 0.3;
+    this.radius = 2;
     this.hasError = false;
 
     this.connectionsAlphaInc = 0.01;
@@ -126,6 +127,8 @@ var Particle = function(id, x, y){
             }
         }
     }
+
+    this.onLeaving = null;
 };
 
 var GridCell = function(id, rowIndex, colIndex, posLeftTop, width, height) {
@@ -178,12 +181,17 @@ var GridCell = function(id, rowIndex, colIndex, posLeftTop, width, height) {
         var savedParticles = [];
         var posX = 0;
         var posY = 0;
+        var p = null;
         for(var i = 0; i < this.particles.length; i++) {
             posX = Math.round(this.particles[i].position.x);
             posY = Math.round(this.particles[i].position.y);
-            if(Math.ceil(posX) < this.left || Math.floor(posX) > this.right || Math.ceil(posY) < this.top || Math.floor(posY) > this.bottom){
+            
+            if(posX < this.left || posX > this.right || posY < this.top || posY > this.bottom){
                 this.particles[i].cell = null;
                 removedParticles.push(this.particles[i]);
+                if(this.particles[i].onLeaving != null) {
+                    this.particles[i].onLeaving(this.particles[i]);
+                }
             } else {
                 savedParticles.push(this.particles[i]);
             }
@@ -210,16 +218,25 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
     this.rowsCount = 0;
     this.colsCount = 0;
 
-    this.cellsSearchRadius = 3;
+    this.width = 0;
+    this.height = 0;
+
+    this.cellsSearchRadius = 5;
     this.cellsIgnoreRadius = 1;
-    this.maxJoins = 3;
+    this.maxJoins = 5;
     
     this.distanceErrorThreshold = 200;
+
+    this.getCellForPosition = function(x, y){
+        var xIndex = Math.floor(x / this.cellFixedWidth);
+        var yIndex = Math.floor(y / this.cellFixedHeight);
+        return this.cells[yIndex][xIndex];
+    }
 
     this.getCellForParticle = function (particle) {
         var xIndex = Math.floor(particle.position.x / this.cellFixedWidth);
         var yIndex = Math.floor(particle.position.y / this.cellFixedHeight);
-        return this.cells[yIndex][xIndex];
+        return this.getCellForPosition(particle.position.x, particle.position.y);
     }
     
 
@@ -228,7 +245,9 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
         var id = 0;
         this.cells = [];
         this.rowsCount = 0;
-        
+        this.width = width;
+        this.height = height;
+
         for(var sumHeight = 0; sumHeight < height; sumHeight += this.cellFixedHeight, this.rowsCount++){
             this.colsCount = 0;
             this.cells.push([]);
@@ -292,7 +311,11 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
         }
     }
 
-    this.initNeighborsForCells = function () {
+    this.initNeighborsForCells = function (minR, maxR, shouldShuffle) {
+        minR = minR || this.cellsIgnoreRadius;
+        maxR = maxR || this.cellsSearchRadius;
+        shouldShuffle = shouldShuffle || true;
+
         var shuffle = function(array) {
             var currentIndex = array.length, temporaryValue, randomIndex;
             while (0 !== currentIndex) {
@@ -306,21 +329,28 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
             return array;
         }
         this.iterateCells(function(cell, grid) {
-            var ignoreY = [cell.rowIndex - grid.cellsIgnoreRadius, cell.rowIndex + grid.cellsIgnoreRadius];
-            var ignoreX = [cell.colIndex - grid.cellsIgnoreRadius, cell.colIndex + grid.cellsIgnoreRadius];
-            for (var yIndex = cell.rowIndex - grid.cellsSearchRadius; yIndex < (cell.rowIndex + grid.cellsSearchRadius) && yIndex < grid.rowsCount; yIndex++) {
-                for (var xIndex = cell.colIndex - grid.cellsSearchRadius; xIndex < (cell.colIndex + grid.cellsSearchRadius) && xIndex < grid.colsCount; xIndex++) {
-                    if(yIndex >= 0 && xIndex >= 0) {
-                        if((yIndex <= ignoreY[0] || yIndex >= ignoreY[1]) && (xIndex <= ignoreX[0] || xIndex >= ignoreX[1])) {
-                            if(yIndex != cell.rowIndex || xIndex != cell.colIndex){
-                                cell.neighbors.push(grid.cells[yIndex][xIndex]);
-                            }
+            var neighbors = grid.getCellsNeighbors(minR, maxR, cell, grid);
+
+            cell.neighbors = shouldShuffle? shuffle(neighbors): neighbors;
+        });
+    }
+
+    this.getCellsNeighbors = function(minR, maxR, cell, grid) {
+        var neighbors = [];
+        var ignoreY = [cell.rowIndex - minR, cell.rowIndex + minR];
+        var ignoreX = [cell.colIndex - minR, cell.colIndex + minR];
+        for (var yIndex = cell.rowIndex - maxR; yIndex <= (cell.rowIndex + maxR) && yIndex < grid.rowsCount; yIndex++) {
+            for (var xIndex = cell.colIndex - maxR; xIndex <= (cell.colIndex + maxR) && xIndex < grid.colsCount; xIndex++) {
+                if(yIndex >= 0 && xIndex >= 0) {
+                    if((yIndex <= ignoreY[0] || yIndex >= ignoreY[1]) || (xIndex <= ignoreX[0] || xIndex >= ignoreX[1])) {
+                        if(yIndex != cell.rowIndex || xIndex != cell.colIndex){
+                            neighbors.push(grid.cells[yIndex][xIndex]);
                         }
                     }
                 }
             }
-            cell.neighbors = shuffle(cell.neighbors);
-        });
+        }
+        return neighbors;
     }
 
     function getNeighbors(particle) {
@@ -343,6 +373,11 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
                 for (var i = 0; i < cell.particles.length; i++) {
                     var p = cell.particles[i];
                     p.addChilds(getNeighbors(p).slice(0, this.maxJoins));
+                    p.childs.forEach(function(v){
+                        if(v.cell.isCustom != p.cell.isCustom){
+                            var a = 1;
+                        }
+                    });
                 }
             }
         }
@@ -368,8 +403,66 @@ var ParticleGrid = function(width, height, particles, enableDebug) {
     this.initGrid(width, height, particles);
 }
 
-var SnowflakeParticleGrid = function(grid){
-   
+var SnowflakeParticleGrid = function(particleGrid, defParticleSpeed){
+    'use strict';
+
+    var centerOffsetX = -32; //weird
+    var nodeSpeed = 0.5;
+
+    function initSnowflakeCenterCell(grid) {
+        var centerCell = grid.getCellForPosition(grid.width / 2 + centerOffsetX, grid.height / 2);
+        centerCell.neighbors = grid.getCellsNeighbors(0, 3, centerCell, grid);
+        centerCell = formatNodeCell(centerCell, grid.getCellsNeighbors(0, 3, centerCell, grid));
+
+        centerCell.getNode = function() {
+            if(centerCell.particles.length > 0) {
+                return centerCell.particles[0];
+            } else {
+                var neighbors = centerCell.neighbors.reduce(function(acc, val){
+                    return acc.concat(val);
+                }, []);
+                if(neighbors.length > 0) {
+                    return neighbors[0];
+                } else {
+                    return null;
+                }
+            }
+        }
+
+        return centerCell;
+    }
+
+    function formatNodeCell(cell, newNeighborCb) {
+        cell.isCustom = true;
+        cell.neighbors = cell.neighbors.map(function(c){
+            c.isCustom = true;
+            return c;
+        });
+        return cell;
+    }
+
+    function clearNeighbors(cell) {
+        cell.neighbors.forEach(function(c) {
+            c.neighbors = c.neighbors.filter(function(n){
+                return n.id != c.id;
+            });
+        });
+        return cell;
+    }
+
+    this.update = function(){
+        particleGrid.update();
+    }
+
+    this.iterateCells = function(cb) {
+        particleGrid.iterateCells(cb);
+    }
+
+    var init = function(grid) {
+        initSnowflakeCenterCell(grid);
+    }
+
+    init(particleGrid);
 }
 
 var ParticleNet = function($canvas, enableDebug){
@@ -395,7 +488,7 @@ var ParticleNet = function($canvas, enableDebug){
     var grid = {};
 
     //for debug
-    var showGrid = enableDebug || false;
+    var showGrid = enableDebug || true;
     var showParticlesWithError = enableDebug || false;
     var stopOnErrors = enableDebug || false;
     var hasError = false;
@@ -496,7 +589,7 @@ var ParticleNet = function($canvas, enableDebug){
     };
 
     var initGrid = function() {
-        grid = new ParticleGrid(width, height, particles, enableDebug);
+        grid = new SnowflakeParticleGrid(new ParticleGrid(width, height, particles, enableDebug), particleSpeed);
     }
 
     var addEvent = function($el, eventType, handler) {
@@ -544,7 +637,7 @@ var ParticleNet = function($canvas, enableDebug){
             } else {
                 context.beginPath();
                 context.fillStyle = 'rgba(255, 255, 255, ' +particle.jointAlpha.toPrecision(3) + ')';
-                context.arc(particle.position.x, particle.position.y, 2, 0, 2 * Math.PI);
+                context.arc(particle.position.x, particle.position.y, particle.radius, 0, 2 * Math.PI);
                 context.fill();
             } 
 
@@ -567,6 +660,11 @@ var ParticleNet = function($canvas, enableDebug){
                 context.font = "10px Arial";
                 context.fillText(cell.id, cell.left, cell.top + 10);
                 context.rect(cell.left, cell.top, cell.width, cell.height);
+                if(cell.isCustom) {
+                    context.fillStyle = 'rgba(0, 0, 255, 0.3)';
+                    context.fillRect(cell.left, cell.top, cell.width, cell.height);
+                    context.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                }
                 if(showParticlesWithError && cell.hasError) {
                     context.fillStyle = 'rgba(255, 0, 0, 0.2)';
                     context.fillRect(cell.left, cell.top, cell.width, cell.height);
