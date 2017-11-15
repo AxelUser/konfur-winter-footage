@@ -135,6 +135,7 @@ var GridCell = function(id, rowIndex, colIndex, posLeftTop, width, height) {
     'use strict';
 
     this.isCustom = false;
+    this.isSelected = false;
 
     this.id = id || 0;
     this.width = width || 0;
@@ -180,9 +181,8 @@ var GridCell = function(id, rowIndex, colIndex, posLeftTop, width, height) {
         for(var i = 0; i < this.neighbors.length; i++) {
             var n = this.neighbors[i];
             n.neighbors = n.neighbors.filter(function(nn){
-                return n.id != nn.id;
-            });
-            //n.neighbors = [];
+                return this.id != nn.id;
+            },this);
         }
     }
 
@@ -421,13 +421,16 @@ var SnowflakeParticleGrid = function(particleGrid, defParticleSpeed){
 
     function initSnowflakeCenterCell(grid) {
         var centerCell = grid.getCellForPosition(grid.width / 2 + centerOffsetX, grid.height / 2);
-        // var centerCellNeighbors = grid.getCellsNeighbors(0, 3, centerCell, grid);
-        // centerCellNeighbors.forEach(function(n){
-        //     n.removeSelfFromNeighbors();
-        // });
-        // centerCell.removeSelfFromNeighbors();
-        // centerCell.neighbors = centerCellNeighbors;
-        centerCell = formatNodeCell(centerCell, grid.getCellsNeighbors(0, 3, centerCell, grid));
+        var centerCellNeighbors = grid.getCellsNeighbors(0, 3, centerCell, grid);
+        centerCellNeighbors.forEach(function(n){            
+            n.removeSelfFromNeighbors();
+        });
+        centerCell.removeSelfFromNeighbors();
+        centerCell.neighbors = centerCellNeighbors;
+        centerCell.neighbors.forEach(function(c) {
+            c.neighbors = centerCellNeighbors;
+        });
+        centerCell = formatNodeCell(centerCell);
 
         centerCell.getNode = function() {
             if(centerCell.particles.length > 0) {
@@ -473,6 +476,10 @@ var SnowflakeParticleGrid = function(particleGrid, defParticleSpeed){
         particleGrid.iterateCells(cb);
     }
 
+    this.getCellForPosition = function(x, y) {
+        return particleGrid.getCellForPosition(x, y);
+    }
+
     var init = function(grid) {
         initSnowflakeCenterCell(grid);
     }
@@ -504,18 +511,57 @@ var ParticleNet = function($canvas, enableDebug){
 
     //for debug
     var showGrid = enableDebug || false;
+
     var showParticlesWithError = enableDebug || false;
     var stopOnErrors = enableDebug || false;
-    var pauseOnClick = enableDebug || false;
     var hasError = false;
 
+    var pauseOnClick = enableDebug || false;
     var stopOnBlur = true;
     var runLoop = true;
+
+    var selectOnDbClick = enableDebug || false;
+    var selectedCell = null;
 
     this.setDebugMode = function(isDebug) {
         showGrid = isDebug;
         showParticlesWithError = isDebug;
         stopOnErrors = isDebug;
+        pauseOnClick = isDebug;
+        selectOnDbClick = isDebug;
+    }
+
+    var handleVisibilityChange = function() {
+        if (document[hidden]) {
+            stopLoop();
+        } else {
+            continueLoop();
+        }
+    }
+
+    var handlePauseClick = function(e){
+        if(e.ctrlKey) {
+            if(runLoop) {
+                stopLoop();
+            } else {
+                continueLoop();
+            }
+        }
+    }
+
+    var handleSelectDbClick = function(e){
+        if(selectedCell != null) {
+            selectedCell.isSelected = false;
+            selectedCell.neighbors.forEach(function(val) {
+                val.isSelected = false;
+            });
+        }
+        var c = grid.getCellForPosition(e.clientX, e.clientY);
+        c.isSelected = true;
+        c.neighbors.forEach(function(val) {
+            val.isSelected = true;
+        });
+        selectedCell = c;
     }
 
     var initPauseOnInactiveTab = function() {
@@ -529,15 +575,6 @@ var ParticleNet = function($canvas, enableDebug){
         } else if (typeof document.webkitHidden !== "undefined") {
             hidden = "webkitHidden";
             visibilityChange = "webkitvisibilitychange";
-        }
-        
-        
-        function handleVisibilityChange() {
-            if (document[hidden]) {
-                stopLoop();
-            } else {
-                continueLoop();
-            }
         }
 
         if (typeof document[hidden] === "undefined") {
@@ -562,14 +599,12 @@ var ParticleNet = function($canvas, enableDebug){
             initPauseOnInactiveTab();
         }
 
+        if(selectOnDbClick) {
+            addEvent(window, 'dblclick', handleSelectDbClick);
+        }
+
         if(pauseOnClick) {
-            addEvent(window, 'click', function() {
-                if(runLoop) {
-                    stopLoop();
-                } else {
-                    continueLoop();
-                }
-            });
+            addEvent(window, 'click', handlePauseClick);
         }
 
         initCanvas();
@@ -686,7 +721,7 @@ var ParticleNet = function($canvas, enableDebug){
                 context.font = "10px Arial";
                 context.fillText(cell.id, cell.left, cell.top + 10);
                 context.rect(cell.left, cell.top, cell.width, cell.height);
-                if(cell.isCustom) {
+                if(cell.isSelected) {
                     context.fillStyle = 'rgba(0, 0, 255, 0.3)';
                     context.fillRect(cell.left, cell.top, cell.width, cell.height);
                     context.fillStyle = 'rgba(255, 255, 255, 0.5)';
