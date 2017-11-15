@@ -546,12 +546,12 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
     }
 
     var afterCreateCb = function(grid) {
-        var center = initSnowflakeCenterCell(grid);        
-        var tier1cells = initTierNodes(grid, center, 128, 1, [center]);
+        var center = initSnowflakeCenterCell(grid);
+        var tier1cells = initTierNodes(grid, center, Math.round(height / 2 * 0.4), 1, [center]);
         
-        var tier2cells = initTierNodes(grid, center, 256, 2, tier1cells);
+        var tier2cells = initTierNodes(grid, center, Math.round(height / 2 * 0.7), 2, tier1cells);
         
-        var tier3cells = initTierNodes(grid, center, 512, 2, tier2cells);
+        var tier3cells = initTierNodes(grid, center, Math.round(height / 2 * 1.1), 2, tier2cells);
 
         nodeCells = nodeCells.concat(center, tier2cells, tier3cells, tier1cells);
         center.neighbors = center.neighbors.concat(tier1cells);
