@@ -131,7 +131,7 @@ var Particle = function(id, x, y){
     this.onLeaving = null;
 };
 
-var GridCell = function(id, rowIndex, colIndex, posLeftTop, width, height) {
+var GridCell = function(id, rowIndex, colIndex, posLeftTop, width, height, maxJoins) {
     'use strict';
 
     this.isCustom = false;
@@ -142,6 +142,8 @@ var GridCell = function(id, rowIndex, colIndex, posLeftTop, width, height) {
     this.height = height || 0;
     this.rowIndex = rowIndex || 0;
     this.colIndex = colIndex || 0;
+
+    this.maxJoins = maxJoins;
 
     this.top = posLeftTop.y;
     this.bottom = posLeftTop.y + height;
@@ -236,13 +238,13 @@ var ParticleGrid = function(width, height, options) {
 
     this.cellsSearchRadius = 2;
     this.cellsIgnoreRadius = 1;
-    this.maxJoins = 5;
+    this.maxJoins = opt.maxJoins || 1;
     
     this.distanceErrorThreshold = 200;
 
     // Extesions
     var onAfterGridCreationCb = opt.onAfterGridCreation;
-    var particleFactoryCb = opt.particleFactory;
+    var getTrianglesPointsCb = opt.trianglesPointsFactory;
 
     this.getCellForPosition = function(x, y){
         var xIndex = Math.floor(x / this.cellFixedWidth);
@@ -255,8 +257,14 @@ var ParticleGrid = function(width, height, options) {
         var yIndex = Math.floor(particle.position.y / this.cellFixedHeight);
         return this.getCellForPosition(particle.position.x, particle.position.y);
     }
-    
 
+    this.getTrianglesPoints = function() {
+        if(getTrianglesPointsCb){
+            return getTrianglesPointsCb();
+        } else {
+            return null;
+        }
+    }
 
     this.initGrid = function () {
         var id = 0;
@@ -270,14 +278,14 @@ var ParticleGrid = function(width, height, options) {
                 var pos = new Vector(sumWidth, sumHeight);
                 var h = sumHeight + this.cellFixedHeight <= this.height? this.cellFixedHeight: this.height - sumHeight;
                 var w = sumWidth + this.cellFixedWidth <= this.width? this.cellFixedWidth: this.width - sumWidth;
-                this.cells[this.rowsCount].push(new GridCell(id, this.rowsCount, this.colsCount, pos, w, h));
+                this.cells[this.rowsCount].push(new GridCell(id, this.rowsCount, this.colsCount, pos, w, h, this.maxJoins));
             }
         }
         
         this.initNeighborsForCells();
 
         if(onAfterGridCreationCb){
-            onAfterGridCreationCb(grid);
+            onAfterGridCreationCb(this);
         }
     }
 
@@ -395,7 +403,7 @@ var ParticleGrid = function(width, height, options) {
                 var cell = cellsRow[ci];
                 for (var i = 0; i < cell.particles.length; i++) {
                     var p = cell.particles[i];
-                    p.addChilds(getNeighbors(p).slice(0, this.maxJoins));
+                    p.addChilds(getNeighbors(p).slice(0, cell.maxJoins));
                     p.childs.forEach(function(v){
                         if(v.cell.isCustom != p.cell.isCustom){
                             var a = 1;
@@ -437,13 +445,16 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
 
     var centerOffsetX = -32; //weird
     var nodeSpeed = 0.5;
+    var snowflakeMaxJoins = 15;
     var nodeCells = [];
+    var upperTrianglePoints = [];
+    var lowerTrianglePoints = [];
 
     function initSnowflakeCenterCell(grid) {
         var node = null;
-
-        var centerCell = formatNodeCell(grid.getCellForPosition(grid.width / 2 + centerOffsetX, grid.height / 2), 
-                                grid.getCellsNeighbors(0, 2, centerCell, grid));
+        
+        var centerCell = grid.getCellForPosition(grid.width / 2 + centerOffsetX, grid.height / 2)
+        centerCell = formatNodeCell(centerCell, grid.getCellsNeighbors(0, 2, centerCell, grid));
 
         centerCell.getNode = function() {
             if(centerCell.particles.length > 0) {
@@ -462,12 +473,7 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
         
         centerCell.updateNode = function() {
             node = centerCell.getNode();
-            if(node == null) {
-                var id = grid.particles[grid.particles.length - 1].id+1;
-                node = new Particle(id, centerCell.center.x, centerCell.center.y);
-                node.wasCreated = true;
-                node.speed = 0;
-            }
+
             node.speed = nodeSpeed;
             node.radius = 4;
             
@@ -476,8 +482,6 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
             }
 
         }
-
-        nodeCells.push(centerCell);
 
         return centerCell;
     }
@@ -488,12 +492,16 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
         return grid.getCellForPosition(x, y);
     }
 
-    function initTier1Nodes(grid, centerCell) {
-        for(var a = 0; a < 2*Math.PI; a+=2*Math.PI/6){
-            var nodeCell = formatNodeCell(getCellAtAngle(a, 192, centerCell, grid), 
-                                        grid.getCellsNeighbors(0, 1, nodeCell, grid),
-                                        centerCell.neighbors);
-
+    function initTierNodes(grid, centerCell, radius, nRadius, prevTierNodes) {
+        var tiercells = [];
+        var points = 6;
+        for(var a = 0, i = 0; a < 2*Math.PI - 2*Math.PI/(points*2); a+=2*Math.PI/points, i++){
+            var nodeCell = getCellAtAngle(a, radius, centerCell, grid);
+            var prevNode = prevTierNodes.length == points? prevTierNodes[i]: prevTierNodes[0];
+            nodeCell = formatNodeCell(nodeCell, 
+                            grid.getCellsNeighbors(0, nRadius, nodeCell, grid),
+                            prevNode);
+            
             nodeCell.getNode = function() {
                 if(nodeCell.particles.length > 0) {
                     return nodeCell.particles[0];
@@ -508,14 +516,16 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
                     }
                 }
             }
-
-            nodeCells.push(nodeCell);
+            tiercells.push(nodeCell);
+            
         }
+        
+        return tiercells;
     }
 
-    function formatNodeCell(cell, selfNeighbors, foreignNeighbors) {
+    function formatNodeCell(cell, selfNeighbors, foreignNode) {
         var sn = selfNeighbors || [];
-        var fn = foreignNeighbors || [];
+        var fn = foreignNode && foreignNode.neighbors || [];
         cell.neighbors.forEach(function(n){
             n.removeSelfFromNeighbors();
         });
@@ -523,27 +533,43 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
         cell.neighbors = sn;
         cell.neighbors.forEach(function(c) {
             c.isCustom = true;
-            c.neighbors = sn.concat(cell).concat(fn);
+            c.maxJoins = snowflakeMaxJoins;
+            c.neighbors = sn.concat(cell);
+            if(foreignNode != null) {
+                c.neighbors.concat(foreignNode);
+            }
         });
+        cell.neighbors = cell.neighbors.concat(fn);
         cell.isCustom = true;
-
+        cell.maxJoins = snowflakeMaxJoins;
         return cell;
     }
 
     var afterCreateCb = function(grid) {
-        var center = initSnowflakeCenterCell(grid);
-        initTier1Nodes(grid, center);
+        var center = initSnowflakeCenterCell(grid);        
+        var tier1cells = initTierNodes(grid, center, 128, 1, [center]);
+        
+        var tier2cells = initTierNodes(grid, center, 256, 1, tier1cells);
+        
+        var tier3cells = initTierNodes(grid, center, 512, 3, tier2cells);
+
+        nodeCells = nodeCells.concat(center, tier2cells, tier3cells, tier1cells);
+        center.neighbors = center.neighbors.concat(tier1cells);
     }
 
     var particlesFactory = function(grid) {
         var id = 0;
 
         var particles = nodeCells.map(function(v, i){
-            var v = new Particle(i, v.center.x, v.center.y);
-            v.radius = 4;
+            var p = new Particle(i, v.center.x, v.center.y);
+            p.radius = 4;
+            return p;
         });
 
-        var count = width * height / 7000;
+        upperTrianglePoints = [particles[0], particles[1], particles[3]];
+        lowerTrianglePoints = [particles[0], particles[1], particles[5]];
+
+        var count = width * height / 8000;
         var x = 0,
             y = 0;
         for(var i = 0; i < count; i++){
@@ -561,13 +587,20 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
         return particles;
     }
 
-    var initOptions = function() {
-        var center = initSnowflakeCenterCell(grid);
-        initTier1Nodes(grid, center);
+    var getOptions = function(enableDebug) {
+        var opt = {
+            onAfterGridCreation: afterCreateCb,
+            trianglesPointsFactory: function(grid) {
+                return [upperTrianglePoints, lowerTrianglePoints];
+            },
+            enableDebug: enableDebug
+        }
+        return opt;
+
     }
 
     var createGrid = function(width, height, enableDebug){
-        var grid = new ParticleGrid(width, height, { enableDebug: enableDebug });
+        var grid = new ParticleGrid(width, height, getOptions(enableDebug));
         grid.initGrid();
         grid.addParticles(particlesFactory);
 
@@ -754,26 +787,6 @@ var ParticleNet = function($canvas, enableDebug){
         }
     };
 
-    var generateParticles = function(){
-        var count = width * height / 7000;
-        particles = [];
-        var x = 0,
-            y = 0;
-        for(var i = 0; i < count; i++){
-            x = Math.random() * window.innerWidth;
-            y = Math.random() * window.innerHeight;
-
-            var particle = new Particle(i, x, y);
-            particle.velocity.x = Math.random() -0.5;
-            particle.velocity.y = Math.random() -0.5;
-            particle.velocity.nor();
-            particle.speed = particleSpeed;
-            particles.push(particle);
-        }
-
-        return particles;
-    };
-
     var draw = function(){
         context.clearRect ( 0 , 0 , width , height );
         context.lineWidth = 1.2;
@@ -804,6 +817,8 @@ var ParticleNet = function($canvas, enableDebug){
             }
         }
 
+        drawTriangles(context, grid);
+
         if(showGrid) {
             context.strokeStyle = 'green';
             context.fillStyle = 'rgba(255, 255, 255, 0.5)';
@@ -812,7 +827,7 @@ var ParticleNet = function($canvas, enableDebug){
                 context.font = "10px Arial";
                 context.fillText(cell.id, cell.left, cell.top + 10);
                 context.rect(cell.left, cell.top, cell.width, cell.height);
-                if(cell.isSelected || cell.isCustom) {
+                if(cell.isSelected) {
                     context.fillStyle = 'rgba(0, 0, 255, 0.3)';
                     context.fillRect(cell.left, cell.top, cell.width, cell.height);
                     context.fillStyle = 'rgba(255, 255, 255, 0.5)';
@@ -826,6 +841,33 @@ var ParticleNet = function($canvas, enableDebug){
             context.stroke();
         }
     };
+
+    var drawTriangles = function(context, grid){
+        var trianlesPoints = grid.getTrianglesPoints();
+        var color = darkTriangleColor;
+        if(trianlesPoints != null) {
+            for (var t = 0; t < trianlesPoints.length; t++) {
+                var triangle = trianlesPoints[t];
+                context.beginPath();
+                context.moveTo(triangle[0].position.x, triangle[0].position.y);
+                context.fillStyle = color;
+                for(var p = 1; p < 3; p++){
+                    context.lineTo(triangle[p].position.x, triangle[p].position.y);
+                }
+
+                context.fill();
+
+                for(var p = 0; p < 3; p++){
+                    context.beginPath();
+                    context.fillStyle = 'rgba(255, 255, 255, 1)';
+                    context.arc(triangle[p].position.x, triangle[p].position.y, triangle[p].radius, 0, 2 * Math.PI);
+                    context.fill();
+                }                
+
+                color = lightTriangleColor;
+            }
+        }
+    }
 
     var getAnimationFrame = function(callback){
         if(window.requestAnimationFrame){
