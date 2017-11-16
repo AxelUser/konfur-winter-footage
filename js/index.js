@@ -180,10 +180,13 @@ var GridCell = function(id, rowIndex, colIndex, posLeftTop, width, height, maxJo
         return true;
     }
 
-    this.removeSelfFromNeighbors = function(){
+    this.removeSelfFromNeighbors = function(ignorePredicate){
         for(var i = 0; i < this.neighbors.length; i++) {
             var n = this.neighbors[i];
             n.neighbors = n.neighbors.filter(function(nn){
+                if(ignorePredicate != undefined && ignorePredicate(nn)){
+                    return true;
+                }
                 return this.id != nn.id;
             },this);
         }
@@ -239,12 +242,14 @@ var ParticleGrid = function(width, height, options) {
     this.cellsSearchRadius = 1;
     this.cellsIgnoreRadius = 0;
     this.maxJoins = opt.maxJoins || 1;
+    this.maxNeighborsToConnect = 5;
     
     this.distanceErrorThreshold = 200;
 
     // Extesions
     var onAfterGridCreationCb = opt.onAfterGridCreation;
     var getTrianglesPointsCb = opt.trianglesPointsFactory;
+    var onRequestAdditionalNeighborsCb = opt.onRequestAdditionalNeighbors;
 
     this.getCellForPosition = function(x, y){
         var xIndex = Math.floor(x / this.cellFixedWidth);
@@ -390,7 +395,12 @@ var ParticleGrid = function(width, height, options) {
         
         for (var i = 0; i < cell.neighbors.length; i++) {
             var neighborCell = cell.neighbors[i];
-            neighbors = neighbors.concat(neighborCell.particles);
+            neighbors = neighbors.concat(neighborCell.particles.filter(function(n){
+                return n.connectionsMap[particle.id+""] == null;
+            }));
+        }
+        if(neighbors.length == 0 && onRequestAdditionalNeighborsCb != null){
+            neighbors = onRequestAdditionalNeighborsCb(particle);
         }
 
         return neighbors;
@@ -404,11 +414,6 @@ var ParticleGrid = function(width, height, options) {
                 for (var i = 0; i < cell.particles.length; i++) {
                     var p = cell.particles[i];
                     p.addChilds(getNeighbors(p).slice(0, cell.maxJoins));
-                    p.childs.forEach(function(v){
-                        if(v.cell.isCustom != p.cell.isCustom){
-                            var a = 1;
-                        }
-                    });
                 }
             }
         }
@@ -445,7 +450,7 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
 
     var centerOffsetX = -32; //weird
     var nodeSpeed = 0.5;
-    var snowflakeMaxJoins = 3;
+    var snowflakeMaxJoins = 5;
     var nodeCells = [];
     var upperTrianglePoints = [];
     var lowerTrianglePoints = [];
@@ -453,8 +458,8 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
     function initSnowflakeCenterCell(grid) {
         var node = null;
         
-        var centerCell = grid.getCellForPosition(grid.width / 2 + centerOffsetX, grid.height / 2)
-        centerCell = formatNodeCell(centerCell, grid.getCellsNeighbors(0, 2, centerCell, grid));
+        var centerCell = grid.getCellForPosition(grid.width / 2 + centerOffsetX, grid.height / 2);
+        centerCell = formatNodeCell(centerCell, snowflakeMaxJoins, grid.getCellsNeighbors(0, 1, centerCell, grid));
 
         centerCell.getNode = function() {
             if(centerCell.particles.length > 0) {
@@ -492,28 +497,28 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
         return grid.getCellForPosition(x, y);
     }
 
-    function initBranchesForTierNode(grid, tierNode, tierNodeRad, radius, nRadius) {
+    function initBranchesForTierNode(grid, tierNode, tierNodeRad, radius, nRadius, maxJoins) {
         var radOffset = 2*Math.PI / 6;
         var firstBranchNode = getCellAtAngle(tierNodeRad + radOffset, radius, tierNode, grid);
         var secondBranchNode = getCellAtAngle(tierNodeRad - radOffset, radius, tierNode, grid);
-        firstBranchNode = formatNodeCell(firstBranchNode, 
+        firstBranchNode = formatNodeCell(firstBranchNode, maxJoins, 
             grid.getCellsNeighbors(0, nRadius, firstBranchNode, grid),
             tierNode);
 
-        secondBranchNode = formatNodeCell(secondBranchNode, 
+        secondBranchNode = formatNodeCell(secondBranchNode, maxJoins, 
             grid.getCellsNeighbors(0, nRadius, secondBranchNode, grid),
             tierNode);
 
         return [firstBranchNode, secondBranchNode];
     }
 
-    function initTierNodes(grid, centerCell, radius, nRadius, prevTierNodes, perNodeCb) {
+    function initTierNodes(grid, centerCell, radius, nRadius, maxJoins, prevTierNodes, perNodeCb) {
         var tiercells = [];
         var points = 6;
         for(var a = 0, i = 0; a < 2*Math.PI - 2*Math.PI/(points*2); a+=2*Math.PI/points, i++){
             var nodeCell = getCellAtAngle(a, radius, centerCell, grid);
             var prevNode = prevTierNodes.length == points? prevTierNodes[i]: prevTierNodes[0];
-            nodeCell = formatNodeCell(nodeCell, 
+            nodeCell = formatNodeCell(nodeCell, maxJoins, 
                             grid.getCellsNeighbors(0, nRadius, nodeCell, grid),
                             prevNode);
             
@@ -540,18 +545,24 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
         return tiercells;
     }
 
-    function formatNodeCell(cell, selfNeighbors, foreignNode) {
+    function formatNodeCell(cell, maxJoins, selfNeighbors, foreignNode) {
         var sn = selfNeighbors || [];
         var fn = foreignNode && foreignNode.selfNeighbors || [];
         cell.neighbors.forEach(function(n){
-            n.removeSelfFromNeighbors();
+            n.removeSelfFromNeighbors(function(nCell){
+                return nCell.isCustom;
+            });
         });
-        cell.removeSelfFromNeighbors();
+        cell.removeSelfFromNeighbors(function(n){
+            n.removeSelfFromNeighbors(function(nCell){
+                return nCell.isCustom;
+            });
+        });
         cell.selfNeighbors = sn;
         cell.neighbors = sn;
         cell.neighbors.forEach(function(c) {
             c.isCustom = true;
-            c.maxJoins = snowflakeMaxJoins;
+            c.maxJoins = maxJoins;
             c.neighbors = [cell];
             if(foreignNode != null) {
                 c.neighbors =  c.neighbors.concat(foreignNode, fn);
@@ -559,24 +570,30 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
         });
         cell.neighbors = cell.neighbors.concat(fn);
         cell.isCustom = true;
-        cell.maxJoins = snowflakeMaxJoins;
+        cell.maxJoins = maxJoins;
         return cell;
     }
 
     var afterCreateCb = function(grid) {
         var center = initSnowflakeCenterCell(grid);
-        var tier1cells = initTierNodes(grid, center, Math.round(height / 2 * 0.4), 1, [center]);
+        var tier0cells = initTierNodes(grid, center, Math.round(height / 2 * 0.2), 2, 2, [center]);
+        var tier1cells = initTierNodes(grid, center, Math.round(height / 2 * 0.4), 1, 2, tier0cells);
+        var tier2cells = initTierNodes(grid, center, Math.round(height / 2 * 0.6), 2, 2, tier1cells);
         
         var branches = [];
         var t2BranchesFactory = function(rad, node) {
-            branches = branches.concat(initBranchesForTierNode(grid, node, rad,  Math.round(height / 2 * 0.4), 1));
+            branches = branches.concat(initBranchesForTierNode(grid, node, rad,  Math.round(height / 2 * 0.2), 1, 1));
         }
-        var tier2cells = initTierNodes(grid, center, Math.round(height / 2 * 0.7), 1, tier1cells, t2BranchesFactory);
+        var tier3cells = initTierNodes(grid, center, Math.round(height / 2 * 0.8), 1, 2, tier2cells, t2BranchesFactory);
         
-        var tier3cells = initTierNodes(grid, center, Math.round(height / 2 * 1.1), 1, tier2cells);
+        var tier4cells = initTierNodes(grid, center, Math.round(height / 2 * 1.05), 2, 2, tier3cells);
 
-        nodeCells = nodeCells.concat(center, tier2cells, tier3cells, tier1cells, branches);
+        nodeCells = nodeCells.concat(center, tier2cells, tier4cells, tier3cells, tier1cells, tier0cells, branches);
         center.neighbors = center.neighbors.concat(tier1cells);
+    }
+
+    var requestAdditionalParticles = function(particle){
+        
     }
 
     var particlesFactory = function(grid) {
@@ -584,6 +601,7 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
 
         var particles = nodeCells.map(function(v, i){
             var p = new Particle(i, v.center.x, v.center.y);
+            v.nodeParticle = p;
             
             return p;
         });
