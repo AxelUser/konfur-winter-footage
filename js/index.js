@@ -236,8 +236,8 @@ var ParticleGrid = function(width, height, options) {
     this.width = width;
     this.height = height;
 
-    this.cellsSearchRadius = 2;
-    this.cellsIgnoreRadius = 1;
+    this.cellsSearchRadius = 1;
+    this.cellsIgnoreRadius = 0;
     this.maxJoins = opt.maxJoins || 1;
     
     this.distanceErrorThreshold = 200;
@@ -445,7 +445,7 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
 
     var centerOffsetX = -32; //weird
     var nodeSpeed = 0.5;
-    var snowflakeMaxJoins = 15;
+    var snowflakeMaxJoins = 10;
     var nodeCells = [];
     var upperTrianglePoints = [];
     var lowerTrianglePoints = [];
@@ -492,7 +492,22 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
         return grid.getCellForPosition(x, y);
     }
 
-    function initTierNodes(grid, centerCell, radius, nRadius, prevTierNodes) {
+    function initBranchesForTierNode(grid, tierNode, tierNodeRad, radius, nRadius) {
+        var radOffset = 2*Math.PI / 6;
+        var firstBranchNode = getCellAtAngle(tierNodeRad + radOffset, radius, tierNode, grid);
+        var secondBranchNode = getCellAtAngle(tierNodeRad - radOffset, radius, tierNode, grid);
+        firstBranchNode = formatNodeCell(firstBranchNode, 
+            grid.getCellsNeighbors(0, nRadius, firstBranchNode, grid),
+            tierNode);
+
+        secondBranchNode = formatNodeCell(secondBranchNode, 
+            grid.getCellsNeighbors(0, nRadius, secondBranchNode, grid),
+            tierNode);
+
+        return [firstBranchNode, secondBranchNode];
+    }
+
+    function initTierNodes(grid, centerCell, radius, nRadius, prevTierNodes, perNodeCb) {
         var tiercells = [];
         var points = 6;
         for(var a = 0, i = 0; a < 2*Math.PI - 2*Math.PI/(points*2); a+=2*Math.PI/points, i++){
@@ -517,7 +532,9 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
                 }
             }
             tiercells.push(nodeCell);
-            
+            if(perNodeCb){
+                perNodeCb(a, nodeCell);
+            }
         }
         
         return tiercells;
@@ -550,11 +567,15 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
         var center = initSnowflakeCenterCell(grid);
         var tier1cells = initTierNodes(grid, center, Math.round(height / 2 * 0.4), 1, [center]);
         
-        var tier2cells = initTierNodes(grid, center, Math.round(height / 2 * 0.7), 2, tier1cells);
+        var branches = [];
+        var t2BranchesFactory = function(rad, node) {
+            branches = branches.concat(initBranchesForTierNode(grid, node, rad,  Math.round(height / 2 * 0.4), 1));
+        }
+        var tier2cells = initTierNodes(grid, center, Math.round(height / 2 * 0.7), 2, tier1cells, t2BranchesFactory);
         
-        var tier3cells = initTierNodes(grid, center, Math.round(height / 2 * 1.1), 2, tier2cells);
+        var tier3cells = initTierNodes(grid, center, Math.round(height / 2 * 1.1), 1, tier2cells);
 
-        nodeCells = nodeCells.concat(center, tier2cells, tier3cells, tier1cells);
+        nodeCells = nodeCells.concat(center, tier2cells, tier3cells, tier1cells, branches);
         center.neighbors = center.neighbors.concat(tier1cells);
     }
 
@@ -563,9 +584,13 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
 
         var particles = nodeCells.map(function(v, i){
             var p = new Particle(i, v.center.x, v.center.y);
-            p.radius = 4;
+            
             return p;
         });
+
+        if(particles.length > 0) {
+            particles[0].radius = 4;
+        }
 
         upperTrianglePoints = [particles[0], particles[1], particles[3]];
         lowerTrianglePoints = [particles[0], particles[1], particles[5]];
@@ -790,7 +815,7 @@ var ParticleNet = function($canvas, enableDebug){
 
     var draw = function(){
         context.clearRect ( 0 , 0 , width , height );
-        context.lineWidth = 1.2;
+        context.lineWidth = 1.5;
         particle = {};
         for(i = 0; i < particles.length; i++){
             particle = particles[i];
