@@ -589,7 +589,7 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
         var tier4cells = initTierNodes(grid, center, Math.round(height / 2 * 1.05), 2, 2, tier3cells);
 
         nodeCells = nodeCells.concat(center, tier2cells, tier4cells, tier3cells, tier1cells, tier0cells, branches);
-        center.neighbors = center.neighbors.concat(tier1cells);
+        //center.neighbors = center.neighbors.concat(tier1cells);
     }
 
     var requestAdditionalParticles = function(particle){
