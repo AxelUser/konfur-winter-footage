@@ -525,18 +525,19 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
 
     function formatNodeCell(cell, selfNeighbors, foreignNode) {
         var sn = selfNeighbors || [];
-        var fn = foreignNode && foreignNode.neighbors || [];
+        var fn = foreignNode && foreignNode.selfNeighbors || [];
         cell.neighbors.forEach(function(n){
             n.removeSelfFromNeighbors();
         });
         cell.removeSelfFromNeighbors();
+        cell.selfNeighbors = sn;
         cell.neighbors = sn;
         cell.neighbors.forEach(function(c) {
             c.isCustom = true;
             c.maxJoins = snowflakeMaxJoins;
             c.neighbors = sn.concat(cell);
             if(foreignNode != null) {
-                c.neighbors.concat(foreignNode);
+                c.neighbors =  c.neighbors.concat(foreignNode, fn);
             }
         });
         cell.neighbors = cell.neighbors.concat(fn);
