@@ -445,7 +445,7 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
 
     var centerOffsetX = -32; //weird
     var nodeSpeed = 0.5;
-    var snowflakeMaxJoins = 10;
+    var snowflakeMaxJoins = 3;
     var nodeCells = [];
     var upperTrianglePoints = [];
     var lowerTrianglePoints = [];
@@ -552,7 +552,7 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
         cell.neighbors.forEach(function(c) {
             c.isCustom = true;
             c.maxJoins = snowflakeMaxJoins;
-            c.neighbors = sn.concat(cell);
+            c.neighbors = [cell];
             if(foreignNode != null) {
                 c.neighbors =  c.neighbors.concat(foreignNode, fn);
             }
@@ -571,7 +571,7 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
         var t2BranchesFactory = function(rad, node) {
             branches = branches.concat(initBranchesForTierNode(grid, node, rad,  Math.round(height / 2 * 0.4), 1));
         }
-        var tier2cells = initTierNodes(grid, center, Math.round(height / 2 * 0.7), 2, tier1cells, t2BranchesFactory);
+        var tier2cells = initTierNodes(grid, center, Math.round(height / 2 * 0.7), 1, tier1cells, t2BranchesFactory);
         
         var tier3cells = initTierNodes(grid, center, Math.round(height / 2 * 1.1), 1, tier2cells);
 
@@ -595,7 +595,7 @@ var createSnowflakeParticleGrid = function(width, height, defParticleSpeed, enab
         upperTrianglePoints = [particles[0], particles[1], particles[3]];
         lowerTrianglePoints = [particles[0], particles[1], particles[5]];
 
-        var count = width * height / 8000;
+        var count = width * height / 6000;
         var x = 0,
             y = 0;
         for(var i = 0; i < count; i++){
@@ -843,7 +843,7 @@ var ParticleNet = function($canvas, enableDebug){
             }
         }
 
-        drawTriangles(context, grid);
+        //drawTriangles(context, grid);
 
         if(showGrid) {
             context.strokeStyle = 'green';
